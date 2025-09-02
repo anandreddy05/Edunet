@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="EV Forecast", layout="wide")
 
 # === Load model ===
-model = joblib.load('forecasting_tev_model.pkl')
+model = joblib.load('./forecasting_tev_model.pkl')
 
 # === Styling ===
 st.markdown("""
