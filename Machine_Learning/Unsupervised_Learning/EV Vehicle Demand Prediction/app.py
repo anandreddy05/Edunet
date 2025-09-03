@@ -1,15 +1,16 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-from datetime import datetime
 import matplotlib.pyplot as plt
 
-# Set Streamlit page config first thing
+# === Streamlit Page Config ===
 st.set_page_config(page_title="EV Forecast", layout="wide")
 
 # === Load model ===
-model = joblib.load("Machine_Learning/Unsupervised_Learning/EV Vehicle Demand Prediction/forecasting_tev_model.pkl")
+MODEL_PATH = "Machine_Learning/Unsupervised_Learning/EV Vehicle Demand Prediction/forecasting_tev_model.pkl"
+model = joblib.load(MODEL_PATH)
 
 # === Styling ===
 st.markdown("""
@@ -24,33 +25,34 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Display image after config and styles
-# Stylized title using markdown + HTML
+# === Title & Subtitle ===
 st.markdown("""
     <div style='text-align: center; font-size: 36px; font-weight: bold; color: #FFFFFF; margin-top: 20px;'>
         🔮 EV Adoption Forecaster for a County in Washington State
     </div>
 """, unsafe_allow_html=True)
 
-# Welcome subtitle
 st.markdown("""
     <div style='text-align: center; font-size: 22px; font-weight: bold; padding-top: 10px; margin-bottom: 25px; color: #FFFFFF;'>
         Welcome to the Electric Vehicle (EV) Adoption Forecast tool.
     </div>
 """, unsafe_allow_html=True)
 
-# Image
-st.image("ev-car-factory.jpg", use_container_width=True)
+# === Image ===
+IMAGE_PATH = os.path.join(os.path.dirname(__file__), "ev-car-factory.jpg")
+if os.path.exists(IMAGE_PATH):
+    st.image(IMAGE_PATH, use_container_width=True)
+else:
+    st.warning("⚠️ Image 'ev-car-factory.jpg' not found. Please add it to the project folder.")
 
-# Instruction line
+# === Instruction ===
 st.markdown("""
     <div style='text-align: left; font-size: 22px; padding-top: 10px; color: #FFFFFF;'>
         Select a county and see the forecasted EV adoption trend for the next 3 years.
     </div>
 """, unsafe_allow_html=True)
 
-
-# === Load data (must contain historical values, features, etc.) ===
+# === Load Data ===
 @st.cache_data
 def load_data():
     df = pd.read_csv("preprocessed_ev_data.csv")
@@ -59,7 +61,7 @@ def load_data():
 
 df = load_data()
 
-# === County dropdown ===
+# === County Selection ===
 county_list = sorted(df['County'].dropna().unique().tolist())
 county = st.selectbox("Select a County", county_list)
 
@@ -82,6 +84,7 @@ forecast_horizon = 36
 for i in range(1, forecast_horizon + 1):
     forecast_date = latest_date + pd.DateOffset(months=i)
     months_since_start += 1
+
     lag1, lag2, lag3 = historical_ev[-1], historical_ev[-2], historical_ev[-3]
     roll_mean = np.mean([lag1, lag2, lag3])
     pct_change_1 = (lag1 - lag2) / lag2 if lag2 != 0 else 0
@@ -112,7 +115,7 @@ for i in range(1, forecast_horizon + 1):
     if len(cumulative_ev) > 6:
         cumulative_ev.pop(0)
 
-# === Combine Historical + Forecast for Cumulative Plot ===
+# === Combine Historical + Forecast ===
 historical_cum = county_df[['Date', 'Electric Vehicle (EV) Total']].copy()
 historical_cum['Source'] = 'Historical'
 historical_cum['Cumulative EV'] = historical_cum['Electric Vehicle (EV) Total'].cumsum()
@@ -126,7 +129,7 @@ combined = pd.concat([
     forecast_df[['Date', 'Cumulative EV', 'Source']]
 ], ignore_index=True)
 
-# === Plot Cumulative Graph ===
+# === Plot Cumulative EV ===
 st.subheader(f"📊 Cumulative EV Forecast for {county} County")
 fig, ax = plt.subplots(figsize=(12, 6))
 for label, data in combined.groupby('Source'):
@@ -141,7 +144,7 @@ ax.tick_params(colors='white')
 ax.legend()
 st.pyplot(fig)
 
-# === Compare historical and forecasted cumulative EVs ===
+# === Growth % ===
 historical_total = historical_cum['Cumulative EV'].iloc[-1]
 forecasted_total = forecast_df['Cumulative EV'].iloc[-1]
 
@@ -152,8 +155,7 @@ if historical_total > 0:
 else:
     st.warning("Historical EV total is zero, so percentage forecast change can't be computed.")
 
-
-# === New: Compare up to 3 counties ===
+# === Multi-county Comparison ===
 st.markdown("---")
 st.header("Compare EV Adoption Trends for up to 3 Counties")
 
@@ -161,7 +163,6 @@ multi_counties = st.multiselect("Select up to 3 counties to compare", county_lis
 
 if multi_counties:
     comparison_data = []
-
     for cty in multi_counties:
         cty_df = df[df['County'] == cty].sort_values("Date")
         cty_code = cty_df['county_encoded'].iloc[0]
@@ -193,6 +194,7 @@ if multi_counties:
                 'ev_total_pct_change_3': pct_change_3,
                 'ev_growth_slope': ev_slope
             }
+
             pred = model.predict(pd.DataFrame([new_row]))[0]
             future_rows_cty.append({"Date": forecast_date, "Predicted EV Total": round(pred)})
 
@@ -214,14 +216,12 @@ if multi_counties:
             hist_cum[['Date', 'Cumulative EV']],
             fc_df[['Date', 'Cumulative EV']]
         ], ignore_index=True)
-
         combined_cty['County'] = cty
         comparison_data.append(combined_cty)
 
-    # Combine all counties data for plotting
     comp_df = pd.concat(comparison_data, ignore_index=True)
 
-    # Plot
+    # === Plot Comparison ===
     st.subheader("📈 Comparison of Cumulative EV Adoption Trends")
     fig, ax = plt.subplots(figsize=(14, 7))
     for cty, group in comp_df.groupby('County'):
@@ -235,8 +235,8 @@ if multi_counties:
     ax.tick_params(colors='white')
     ax.legend(title="County")
     st.pyplot(fig)
-    
-    # Display % growth for selected counties ===
+
+    # === Growth Summaries ===
     growth_summaries = []
     for cty in multi_counties:
         cty_df = comp_df[comp_df['County'] == cty].reset_index(drop=True)
@@ -249,8 +249,6 @@ if multi_counties:
         else:
             growth_summaries.append(f"{cty}: N/A (no historical data)")
 
-    # Join all in one sentence and show with st.success
-    growth_sentence = " | ".join(growth_summaries)
-    st.success(f"Forecasted EV adoption growth over next 3 years — {growth_sentence}")
+    st.success(f"Forecasted EV adoption growth over next 3 years — {' | '.join(growth_summaries)}")
 
 st.success("Forecast complete ✅")
