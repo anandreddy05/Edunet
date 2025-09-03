@@ -7,3 +7,5 @@ seaborn
 prophet
 plotly
 statsmodels
+tensorflow
+keras
