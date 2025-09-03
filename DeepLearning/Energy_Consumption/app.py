@@ -9,7 +9,7 @@ import warnings
 # warnings.filterwarnings("ignore")
 
 # Load trained model
-model = pickle.load(open("model.pkl", "rb"))
+model = pickle.load(open("./model.pkl", "rb"))
 
 # Page config
 st.set_page_config(page_title="Energy Consumption Predictor", page_icon="⚡", layout="wide")
